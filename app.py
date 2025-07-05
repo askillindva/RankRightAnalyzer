@@ -59,6 +59,65 @@ def auto_play_summary_audio(summary_text):
         st.error(f"Audio generation failed: {str(e)}")
         st.info("Please check your internet connection for text-to-speech service.")
 
+def generate_ai_revised_document(analysis_data):
+    """
+    Generate an AI-revised version of the document based on evaluation criteria feedback.
+    
+    Args:
+        analysis_data: Dictionary containing analysis results and evaluation criteria
+        
+    Returns:
+        String containing the revised document content
+    """
+    try:
+        # Get the original content
+        original_content = analysis_data.get('content', '')
+        evaluation_results = analysis_data.get('evaluation_results', {})
+        
+        # Create detailed feedback summary for AI revision
+        feedback_summary = []
+        for criterion, result in evaluation_results.items():
+            if result['score'] < 8:  # Focus on areas needing improvement
+                feedback_summary.append(f"""
+**{criterion}** (Score: {result['score']}/10 - {result['ranking']}):
+{result['feedback']}
+Recommendations: {result['recommendations']}
+""")
+        
+        feedback_text = "\n".join(feedback_summary)
+        
+        # Create revision prompt
+        revision_prompt = f"""
+Please revise the following document to address the specific feedback from our evaluation criteria. 
+Focus on restructuring and improving the content based on the detailed feedback provided.
+
+ORIGINAL DOCUMENT:
+{original_content}
+
+EVALUATION FEEDBACK TO ADDRESS:
+{feedback_text}
+
+REVISION INSTRUCTIONS:
+1. Restructure the document to improve clarity and organization
+2. Address each specific feedback point mentioned above
+3. Enhance readability and flow
+4. Ensure completeness and accuracy
+5. Improve compliance with standards where applicable
+6. Make the content more actionable and useful
+
+Please provide a comprehensive revision that addresses all the feedback points while maintaining the original intent and key information of the document.
+"""
+        
+        # Use Azure OpenAI client for revision
+        ai_client = AzureOpenAIClient()
+        revised_content = ai_client.summarize_content(revision_prompt, max_length=2000)
+        
+        return revised_content
+        
+    except Exception as e:
+        st.error(f"Document revision failed: {str(e)}")
+        return f"Error generating revised document: {str(e)}"
+
 # Page configuration
 st.set_page_config(
     page_title="RankRight - Document Analyzer",
@@ -560,6 +619,38 @@ def show_analysis_results(analysis_id):
         st.info("📈 Focus on improving Amber and Red criteria. Prioritize the Red issues first for maximum impact.")
     else:
         st.info("🔧 Immediate action required. Address all Red criteria before proceeding. Consider comprehensive document revision.")
+    
+    # AI Document Revision Button
+    st.subheader("🤖 AI Document Revision")
+    st.markdown("Get an AI-revised version of your document based on the evaluation criteria feedback:")
+    
+    col1, col2 = st.columns([1, 2])
+    with col1:
+        if st.button("📝 Revise Document with AI", type="primary", use_container_width=True):
+            with st.spinner("AI is revising your document based on evaluation feedback..."):
+                revised_document = generate_ai_revised_document(analysis_data)
+                st.session_state[f'revised_document_{analysis_id}'] = revised_document
+    
+    with col2:
+        st.markdown("*AI will restructure and improve your document based on the specific feedback from all six evaluation criteria.*")
+    
+    # Display revised document if available
+    if f'revised_document_{analysis_id}' in st.session_state:
+        st.subheader("📄 AI-Revised Document")
+        revised_content = st.session_state[f'revised_document_{analysis_id}']
+        
+        # Display in expandable text area
+        with st.expander("View Revised Document", expanded=True):
+            st.text_area("Revised Content", revised_content, height=400, disabled=True)
+        
+        # Download button for revised document
+        st.download_button(
+            label="📥 Download Revised Document",
+            data=revised_content,
+            file_name=f"revised_document_{analysis_id}.txt",
+            mime="text/plain",
+            use_container_width=True
+        )
 
 def show_history_page():
     """Display analysis history"""
