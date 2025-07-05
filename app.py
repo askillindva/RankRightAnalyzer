@@ -99,8 +99,22 @@ if 'current_analysis_id' not in st.session_state:
     st.session_state.current_analysis_id = None
 
 def main():
-    st.title("🎯 RankRight - Intelligent Document Analyzer")
-    st.markdown("Analyze documents and Confluence pages with AI-powered insights")
+    # Add company logo at the top left with improved spacing
+    col1, col2 = st.columns([1, 4])
+    
+    with col1:
+        try:
+            st.image("attached_assets/AskiTech2_1751736122642.png", width=150)
+        except FileNotFoundError:
+            st.write("AskiTech")  # Fallback text if logo not found
+    
+    with col2:
+        st.write("")  # Add some vertical spacing
+        st.title("🎯 RankRight - Intelligent Document Analyzer")
+        st.markdown("Analyze documents and Confluence pages with AI-powered insights")
+    
+    # Add separator line
+    st.divider()
     
     # Sidebar for navigation
     with st.sidebar:
