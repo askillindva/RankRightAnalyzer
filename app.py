@@ -99,24 +99,34 @@ if 'current_analysis_id' not in st.session_state:
     st.session_state.current_analysis_id = None
 
 def main():
-    # Add company logo at the top left corner - larger size and better positioning
+    # Remove top padding and add compact layout CSS
+    st.markdown(
+        """
+        <style>
+        .main > div {
+            padding-top: 1rem;
+        }
+        .block-container {
+            padding-top: 1rem;
+        }
+        .logo-container {
+            margin-top: -10px;
+            margin-left: -15px;
+            padding: 0;
+        }
+        .main-title {
+            margin-top: -10px;
+            margin-bottom: 0px;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True
+    )
+    
+    # Add company logo at the top left corner - compact layout
     col1, col2 = st.columns([1.3, 3.7])
     
     with col1:
-        # Position logo closer to top corner with custom CSS
-        st.markdown(
-            """
-            <style>
-            .logo-container {
-                margin-top: -20px;
-                margin-left: -15px;
-                padding: 0;
-            }
-            </style>
-            """,
-            unsafe_allow_html=True
-        )
-        
         try:
             # Larger logo with custom container
             st.markdown('<div class="logo-container">', unsafe_allow_html=True)
@@ -126,8 +136,10 @@ def main():
             st.write("**AskiTech**")  # Fallback text if logo not found
     
     with col2:
+        st.markdown('<div class="main-title">', unsafe_allow_html=True)
         st.title("🎯 RankRight - Intelligent Document Analyzer")
         st.markdown("Analyze documents and Confluence pages with AI-powered insights")
+        st.markdown('</div>', unsafe_allow_html=True)
     
     # Add separator line
     st.divider()
