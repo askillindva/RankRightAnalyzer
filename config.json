@@ -1,0 +1,11 @@
+{
+  "azure_openai": {
+    "endpoint": "https://venka-mco9sfeb-eastus2.cognitiveservices.azure.com/",
+    "api_key": "TO_BE_UPDATED",
+    "api_version": "2025-01-01-preview",
+    "deployment_name": "gpt-4.1",
+    "use_private_endpoint": false,
+    "private_endpoint_ip": "",
+    "private_endpoint_fqdn": ""
+  }
+}
