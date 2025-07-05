@@ -76,36 +76,48 @@ def generate_ai_revised_document(analysis_data):
         
         # Create detailed feedback summary for AI revision
         feedback_summary = []
+        improvement_areas = []
+        
         for criterion, result in evaluation_results.items():
-            if result['score'] < 8:  # Focus on areas needing improvement
+            score = result.get('score', 0)
+            ranking = result.get('ranking', 'Unknown')
+            feedback = result.get('feedback', 'No feedback available')
+            recommendations = result.get('recommendations', [])
+            
+            # Focus on areas that need improvement (score < 8)
+            if score < 8:
                 feedback_summary.append(f"""
-**{criterion}** (Score: {result['score']}/10 - {result['ranking']}):
-{result['feedback']}
-Recommendations: {result['recommendations']}
+{criterion} (Score: {score}/10 - {ranking}):
+{feedback}
+Recommendations: {recommendations if isinstance(recommendations, str) else '; '.join(recommendations)}
 """)
+                improvement_areas.append(criterion)
+        
+        # If no areas need improvement, still provide a polished version
+        if not feedback_summary:
+            feedback_summary.append("Document shows good quality. Focus on minor enhancements for clarity and professionalism.")
         
         feedback_text = "\n".join(feedback_summary)
         
-        # Create revision prompt
+        # Create comprehensive revision prompt
         revision_prompt = f"""
-Please revise the following document to address the specific feedback from our evaluation criteria. 
-Focus on restructuring and improving the content based on the detailed feedback provided.
+You are an expert document editor. Please revise the following document to create an improved, professional version.
 
 ORIGINAL DOCUMENT:
 {original_content}
 
-EVALUATION FEEDBACK TO ADDRESS:
+AREAS TO IMPROVE:
 {feedback_text}
 
-REVISION INSTRUCTIONS:
-1. Restructure the document to improve clarity and organization
-2. Address each specific feedback point mentioned above
-3. Enhance readability and flow
-4. Ensure completeness and accuracy
-5. Improve compliance with standards where applicable
-6. Make the content more actionable and useful
+REVISION REQUIREMENTS:
+1. Restructure for better clarity and logical flow
+2. Improve readability and professional tone
+3. Ensure completeness and accuracy
+4. Enhance organization and structure
+5. Make content more actionable and useful
+6. Address all specific feedback points mentioned above
 
-Please provide a comprehensive revision that addresses all the feedback points while maintaining the original intent and key information of the document.
+Please provide a comprehensive revision that maintains the original intent while significantly improving the document's quality, structure, and effectiveness.
 """
         
         # Use Azure OpenAI client for revision
@@ -115,7 +127,6 @@ Please provide a comprehensive revision that addresses all the feedback points w
         return revised_content
         
     except Exception as e:
-        st.error(f"Document revision failed: {str(e)}")
         return f"Error generating revised document: {str(e)}"
 
 # Page configuration
@@ -620,30 +631,30 @@ def show_analysis_results(analysis_id):
     else:
         st.info("🔧 Immediate action required. Address all Red criteria before proceeding. Consider comprehensive document revision.")
     
-    # AI Document Revision Button
-    st.subheader("🤖 AI Document Revision")
-    st.markdown("Get an AI-revised version of your document based on the evaluation criteria feedback:")
+    # Auto-generate AI-revised document
+    revised_document_key = f'revised_document_{analysis_id}'
+    if revised_document_key not in st.session_state:
+        with st.spinner("Generating AI-revised document based on evaluation feedback..."):
+            try:
+                revised_document = generate_ai_revised_document(analysis_data)
+                st.session_state[revised_document_key] = revised_document
+            except Exception as e:
+                st.error(f"Failed to generate revised document: {str(e)}")
+                st.session_state[revised_document_key] = "Error generating revised document. Please try again."
     
+    # Display AI-revised document
+    st.subheader("📄 AI-Revised Document")
+    st.markdown("*Based on the evaluation criteria feedback, here's an improved version of your document:*")
+    
+    revised_content = st.session_state.get(revised_document_key, "")
+    
+    # Display in expandable text area
+    with st.expander("View AI-Revised Document", expanded=True):
+        st.text_area("Revised Content", revised_content, height=400, disabled=True, key=f"revised_text_{analysis_id}")
+    
+    # Download button for revised document
     col1, col2 = st.columns([1, 2])
     with col1:
-        if st.button("📝 Revise Document with AI", type="primary", use_container_width=True):
-            with st.spinner("AI is revising your document based on evaluation feedback..."):
-                revised_document = generate_ai_revised_document(analysis_data)
-                st.session_state[f'revised_document_{analysis_id}'] = revised_document
-    
-    with col2:
-        st.markdown("*AI will restructure and improve your document based on the specific feedback from all six evaluation criteria.*")
-    
-    # Display revised document if available
-    if f'revised_document_{analysis_id}' in st.session_state:
-        st.subheader("📄 AI-Revised Document")
-        revised_content = st.session_state[f'revised_document_{analysis_id}']
-        
-        # Display in expandable text area
-        with st.expander("View Revised Document", expanded=True):
-            st.text_area("Revised Content", revised_content, height=400, disabled=True)
-        
-        # Download button for revised document
         st.download_button(
             label="📥 Download Revised Document",
             data=revised_content,
@@ -651,6 +662,8 @@ def show_analysis_results(analysis_id):
             mime="text/plain",
             use_container_width=True
         )
+    with col2:
+        st.markdown("*The revised document addresses all feedback points from the evaluation criteria.*")
 
 def show_history_page():
     """Display analysis history"""
