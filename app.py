@@ -99,25 +99,27 @@ Recommendations: {recommendations if isinstance(recommendations, str) else '; '.
         
         feedback_text = "\n".join(feedback_summary)
         
-        # Create comprehensive revision prompt
+        # Create comprehensive revision prompt for actual content editing
         revision_prompt = f"""
-You are an expert document editor. Please revise the following document to create an improved, professional version.
+You are an expert document editor. Please EDIT and REVISE the original document content by implementing the specific recommendations provided. 
 
-ORIGINAL DOCUMENT:
+ORIGINAL DOCUMENT CONTENT:
 {original_content}
 
-AREAS TO IMPROVE:
+SPECIFIC AREAS TO IMPROVE AND IMPLEMENT:
 {feedback_text}
 
-REVISION REQUIREMENTS:
-1. Restructure for better clarity and logical flow
-2. Improve readability and professional tone
-3. Ensure completeness and accuracy
-4. Enhance organization and structure
-5. Make content more actionable and useful
-6. Address all specific feedback points mentioned above
+INSTRUCTIONS:
+- Take the original document content and edit it directly
+- Implement each recommendation by modifying the actual text
+- Restructure paragraphs, sentences, and sections as needed
+- Add missing information where recommendations suggest
+- Improve clarity by rewriting unclear sections
+- Enhance organization by reordering content
+- Make the content more actionable by adding specific steps or examples
+- Maintain all the original information while improving its presentation
 
-Please provide a comprehensive revision that maintains the original intent while significantly improving the document's quality, structure, and effectiveness.
+Please provide the COMPLETE REVISED DOCUMENT with all improvements implemented, not a summary. Keep the same document format and structure but with enhanced content quality.
 """
         
         # Use Azure OpenAI client for revision
@@ -128,6 +130,53 @@ Please provide a comprehensive revision that maintains the original intent while
         
     except Exception as e:
         return f"Error generating revised document: {str(e)}"
+
+def create_word_document(content, analysis_id):
+    """
+    Create a Word document from the revised content.
+    
+    Args:
+        content: The revised document content
+        analysis_id: The analysis ID for the document
+        
+    Returns:
+        Bytes of the Word document
+    """
+    try:
+        from docx import Document
+        import io
+        
+        # Create a new Document
+        doc = Document()
+        
+        # Add title
+        title = doc.add_heading('Revised Document', 0)
+        
+        # Add analysis info
+        doc.add_paragraph(f'Analysis ID: {analysis_id}')
+        doc.add_paragraph(f'Generated on: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}')
+        doc.add_paragraph('')  # Empty line
+        
+        # Add the revised content
+        # Split content into paragraphs and add them
+        paragraphs = content.split('\n\n')
+        for paragraph in paragraphs:
+            if paragraph.strip():
+                doc.add_paragraph(paragraph.strip())
+        
+        # Save to bytes
+        doc_io = io.BytesIO()
+        doc.save(doc_io)
+        doc_io.seek(0)
+        
+        return doc_io.getvalue()
+        
+    except ImportError:
+        # Fallback to text file if python-docx is not available
+        return content.encode('utf-8')
+    except Exception as e:
+        # Fallback to text file on any error
+        return content.encode('utf-8')
 
 # Page configuration
 st.set_page_config(
@@ -652,14 +701,16 @@ def show_analysis_results(analysis_id):
     with st.expander("View AI-Revised Document", expanded=True):
         st.text_area("Revised Content", revised_content, height=400, disabled=True, key=f"revised_text_{analysis_id}")
     
-    # Download button for revised document
+    # Download button for revised document as Word file
     col1, col2 = st.columns([1, 2])
     with col1:
+        # Create Word document
+        word_doc_bytes = create_word_document(revised_content, analysis_id)
         st.download_button(
-            label="📥 Download Revised Document",
-            data=revised_content,
-            file_name=f"revised_document_{analysis_id}.txt",
-            mime="text/plain",
+            label="📥 Download Revised Document (Word)",
+            data=word_doc_bytes,
+            file_name=f"revised_document_{analysis_id}.docx",
+            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
             use_container_width=True
         )
     with col2:
