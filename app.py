@@ -256,13 +256,21 @@ except Exception as e:
     ai_client = AzureOpenAIClient()
     eval_engine = EvaluationEngine(ai_client)
 
-# Session state initialization
+# Session state initialization (runtime-only, cleared on reload)
 if 'analysis_complete' not in st.session_state:
     st.session_state.analysis_complete = False
 if 'current_analysis_data' not in st.session_state:
     st.session_state.current_analysis_data = None
 if 'analysis_history' not in st.session_state:
     st.session_state.analysis_history = []
+    
+# Add session marker to track genuine new sessions
+if 'session_initialized' not in st.session_state:
+    # Clear any existing data on true session start
+    st.session_state.analysis_history = []
+    st.session_state.current_analysis_data = None
+    st.session_state.analysis_complete = False
+    st.session_state.session_initialized = True
 
 def main():
     # Remove top padding and add compact layout CSS
@@ -798,8 +806,21 @@ def show_history_page():
     """Display analysis history from session state"""
     st.header("📚 Analysis History")
     
+    # Session-only warning
+    st.warning("⚠️ **Session-Only Data**: Analysis history is stored temporarily in browser memory and will be cleared when you close the browser tab or reload the page. This application does not use persistent storage.")
+    
     # Get analyses from session state
     analyses = st.session_state.get('analysis_history', [])
+    
+    # Add clear button
+    col1, col2 = st.columns([1, 4])
+    with col1:
+        if st.button("🗑️ Clear History", type="secondary"):
+            st.session_state.analysis_history = []
+            st.session_state.current_analysis_data = None
+            st.session_state.analysis_complete = False
+            st.success("History cleared!")
+            st.rerun()
     
     if not analyses:
         st.info("No analyses found. Start by analyzing a document on the Home page.")
