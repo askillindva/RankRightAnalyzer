@@ -26,6 +26,7 @@ def auto_play_summary_audio(summary_text):
     """Generate and auto-play audio summary using pyttsx3"""
     try:
         import pyttsx3
+        import subprocess
         
         # Initialize pyttsx3 engine
         engine = pyttsx3.init()
@@ -40,18 +41,48 @@ def auto_play_summary_audio(summary_text):
             # Try to use first available voice (usually system default)
             engine.setProperty('voice', voices[0].id)
         
-        # Create temporary audio file
-        with tempfile.NamedTemporaryFile(delete=False, suffix='.wav') as tmp_file:
-            # Save speech to file
-            engine.save_to_file(summary_text, tmp_file.name)
-            engine.runAndWait()
+        # Create temporary WAV file
+        wav_file = tempfile.NamedTemporaryFile(delete=False, suffix='.wav')
+        wav_path = wav_file.name
+        wav_file.close()
+        
+        # Save speech to WAV file
+        engine.save_to_file(summary_text, wav_path)
+        engine.runAndWait()
+        
+        try:
+            # Try to convert WAV to MP3 using ffmpeg if available
+            mp3_file = tempfile.NamedTemporaryFile(delete=False, suffix='.mp3')
+            mp3_path = mp3_file.name
+            mp3_file.close()
             
-            # Read audio file and encode for playback
-            with open(tmp_file.name, 'rb') as audio_file:
+            subprocess.run(['ffmpeg', '-i', wav_path, '-codec:a', 'mp3', mp3_path, '-y'], 
+                         check=True, capture_output=True)
+            
+            # Read MP3 file and encode for playback
+            with open(mp3_path, 'rb') as audio_file:
                 audio_bytes = audio_file.read()
                 audio_base64 = base64.b64encode(audio_bytes).decode()
                 
-            # Create auto-playing audio HTML
+            # Create auto-playing audio HTML with MP3
+            audio_html = f"""
+            <audio controls autoplay style="width: 100%; margin-top: 10px;">
+                <source src="data:audio/mp3;base64,{audio_base64}" type="audio/mp3">
+                Your browser does not support the audio element.
+            </audio>
+            """
+            
+            # Clean up files
+            os.unlink(mp3_path)
+            os.unlink(wav_path)
+            
+        except (subprocess.CalledProcessError, FileNotFoundError):
+            # Fallback to WAV if MP3 conversion fails
+            with open(wav_path, 'rb') as audio_file:
+                audio_bytes = audio_file.read()
+                audio_base64 = base64.b64encode(audio_bytes).decode()
+                
+            # Create auto-playing audio HTML with WAV
             audio_html = f"""
             <audio controls autoplay style="width: 100%; margin-top: 10px;">
                 <source src="data:audio/wav;base64,{audio_base64}" type="audio/wav">
@@ -59,11 +90,11 @@ def auto_play_summary_audio(summary_text):
             </audio>
             """
             
-            st.markdown("🎧 **Auto-playing summary audio:**", unsafe_allow_html=True)
-            st.markdown(audio_html, unsafe_allow_html=True)
+            # Clean up WAV file
+            os.unlink(wav_path)
             
-        # Clean up temporary file
-        os.unlink(tmp_file.name)
+        st.markdown("🎧 **Auto-playing summary audio:**", unsafe_allow_html=True)
+        st.markdown(audio_html, unsafe_allow_html=True)
         
     except ImportError:
         st.warning("Text-to-speech library not available. Please install pyttsx3.")
