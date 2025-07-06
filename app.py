@@ -32,26 +32,36 @@ def auto_play_summary_audio(summary_text):
         wav_path = wav_file.name
         wav_file.close()
         
-        # Generate speech using espeak
+        # Generate speech using espeak with improved quality settings
         espeak_cmd = [
             'espeak',
-            '-s', '150',  # Speed (words per minute)
-            '-a', '100',  # Amplitude (volume)
-            '-v', 'en',   # Voice (English)
-            '-w', wav_path,  # Write to WAV file
+            '-s', '140',      # Slower speed for clarity (words per minute)
+            '-a', '80',       # Moderate amplitude 
+            '-p', '50',       # Pitch variation (0-99, 50 is normal)
+            '-g', '10',       # Gap between words (10ms)
+            '-v', 'en+f3',    # Female voice variant for clarity
+            '-w', wav_path,   # Write to WAV file
             summary_text
         ]
         
         subprocess.run(espeak_cmd, check=True, capture_output=True)
         
         try:
-            # Try to convert WAV to MP3 using ffmpeg if available
+            # Try to convert WAV to MP3 using ffmpeg with audio enhancement
             mp3_file = tempfile.NamedTemporaryFile(delete=False, suffix='.mp3')
             mp3_path = mp3_file.name
             mp3_file.close()
             
-            subprocess.run(['ffmpeg', '-i', wav_path, '-codec:a', 'mp3', mp3_path, '-y'], 
-                         check=True, capture_output=True)
+            # Enhanced ffmpeg command with audio filters for better quality
+            ffmpeg_cmd = [
+                'ffmpeg', '-i', wav_path,
+                '-af', 'highpass=f=80,lowpass=f=8000,volume=1.2',  # Audio filters
+                '-codec:a', 'mp3',
+                '-b:a', '128k',  # Higher bitrate for better quality
+                mp3_path, '-y'
+            ]
+            
+            subprocess.run(ffmpeg_cmd, check=True, capture_output=True)
             
             # Read MP3 file and encode for playback
             with open(mp3_path, 'rb') as audio_file:
