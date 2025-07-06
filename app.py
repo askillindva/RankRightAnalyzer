@@ -20,7 +20,7 @@ def get_star_rating(score):
     stars = int(round(score / 2))  # Convert 0-10 to 0-5 stars
     filled_stars = "★" * stars  # Black filled stars
     empty_stars = "☆" * (5 - stars)  # Empty stars
-    return f"{filled_stars}{empty_stars}"
+    return f"<span style='font-size: 1.5em;'>{filled_stars}{empty_stars}</span>"
 
 def auto_play_summary_audio(summary_text):
     """Generate and auto-play audio summary using espeak"""
@@ -635,35 +635,56 @@ def show_analysis_results(analysis_id):
     
     evaluation_df = pd.DataFrame(evaluation_data)
     
-    # Display the table
-    st.dataframe(
-        evaluation_df,
-        use_container_width=True,
-        hide_index=True,
-        column_config={
-            "Criterion": st.column_config.TextColumn("Evaluation Criteria", width="medium"),
-            "Rating": st.column_config.TextColumn("Star Rating", width="medium"),
-            "Score": st.column_config.TextColumn("Score", width="small")
-        }
-    )
+    # Display the table with HTML rendering for stars
+    st.markdown("""
+    <style>
+    .star-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 20px 0;
+    }
+    .star-table th, .star-table td {
+        border: 1px solid #ddd;
+        padding: 12px;
+        text-align: left;
+    }
+    .star-table th {
+        background-color: #f2f2f2;
+        font-weight: bold;
+    }
+    .star-table tr:nth-child(even) {
+        background-color: #f9f9f9;
+    }
+    .star-table tr:hover {
+        background-color: #f5f5f5;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+    
+    # Create HTML table for better star display
+    table_html = "<table class='star-table'>"
+    table_html += "<tr><th>Evaluation Criteria</th><th>Star Rating</th><th>Score</th></tr>"
+    
+    for _, row in evaluation_df.iterrows():
+        table_html += f"<tr><td>{row['Criterion']}</td><td>{row['Rating']}</td><td>{row['Score']}</td></tr>"
+    
+    table_html += "</table>"
+    st.markdown(table_html, unsafe_allow_html=True)
     
     # Detailed analysis in accordion format
     st.subheader("🔍 Detailed Analysis")
     
     for criterion_name, result in analysis_data['evaluation_results'].items():
-        with st.expander(f"➕ {criterion_name} - {result['ranking']} ({result['score']:.1f}/10)"):
-            # Display detailed analysis
+        with st.expander(f"➕ {criterion_name} - {result['ranking']}"):
+            # Display simplified analysis
             col1, col2 = st.columns([1, 2])
             
             with col1:
-                st.metric("Star Rating", get_star_rating(result['score']))
-                st.metric("Ranking", f"{result['ranking']}")
-                st.metric("Score", f"{result['score']:.1f}/10")
+                st.markdown("**Star Rating:**")
+                st.markdown(get_star_rating(result['score']), unsafe_allow_html=True)
+                st.markdown(f"**Ranking:** {result['ranking']}")
                 
             with col2:
-                st.write("**Analysis:**")
-                st.write(result.get('analysis', 'No detailed analysis available'))
-                
                 if 'recommendations' in result:
                     st.write("**Recommendations:**")
                     recommendations = result['recommendations']
