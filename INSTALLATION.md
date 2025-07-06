@@ -34,7 +34,6 @@ requests>=2.32.4            # HTTP client for web requests
 
 ### Built-in Python Modules (No Installation Required)
 
-- `sqlite3` - Database operations
 - `json` - JSON data handling
 - `os` - Operating system interface
 - `tempfile` - Temporary file management
@@ -129,7 +128,6 @@ streamlit run app.py --server.port 5000
 rankright/
 ├── app.py                  # Main Streamlit application
 ├── azure_openai_client.py  # Azure OpenAI integration
-├── database.py             # SQLite database manager
 ├── document_processor.py   # PDF/DOCX processing
 ├── evaluation_engine.py    # Document evaluation logic
 ├── web_scraper.py          # Web content extraction

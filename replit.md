@@ -25,13 +25,7 @@ RankRight is an AI-powered document analysis application built with Streamlit th
 
 ### Core Modules
 
-1. **DatabaseManager** (`database.py`)
-   - SQLite database operations with two main tables:
-     - `analyses`: Stores analysis metadata and results
-     - `criteria_results`: Detailed criterion-specific evaluations
-   - Handles storage and retrieval of analysis data
-
-2. **DocumentProcessor** (`document_processor.py`)
+1. **DocumentProcessor** (`document_processor.py`)
    - Multi-format document processing (PDF, DOCX, TXT)
    - Uses PyPDF2/pypdf for PDF extraction
    - Uses python-docx for Word document processing
@@ -75,9 +69,9 @@ RankRight is an AI-powered document analysis application built with Streamlit th
    - Scoring and recommendation generation
 
 3. **Data Storage**:
-   - Analysis results stored in SQLite database
-   - Detailed criterion results maintained separately
-   - Timestamp tracking for historical analysis
+   - Analysis results stored in Streamlit session state
+   - In-memory storage for current session only
+   - Data cleared on page reload (no persistence)
 
 4. **Result Presentation**:
    - Streamlit interface displays scores and recommendations
@@ -109,13 +103,13 @@ RankRight is an AI-powered document analysis application built with Streamlit th
 ## Deployment Strategy
 
 ### Local Development
-- SQLite database for data persistence
+- Session state storage (no database required)
 - Environment variable configuration for Azure OpenAI
 - Streamlit development server
 
 ### Production Considerations
-- Database: Currently SQLite (suitable for single-user deployment)
-- Scalability: Consider PostgreSQL migration for multi-user scenarios
+- Storage: Session-based (no persistent storage)
+- Scalability: Suitable for DevPod and containerized deployments
 - Security: Environment-based credential management
 - Caching: Streamlit resource caching for component initialization
 
@@ -142,6 +136,15 @@ AZURE_OPENAI_DEPLOYMENT_NAME=gpt-4o
 - Created ConfigManager for persistent configuration storage
 - Enhanced connection testing to show private endpoint status
 - Updated Azure OpenAI client to support both public and private endpoints
+
+### July 06, 2025
+- **Completely removed SQLite database dependency** for Azure DevPod compatibility
+- Replaced database storage with Streamlit session state storage
+- Removed database.py file and all database-related imports
+- Updated data flow to use in-memory storage only
+- Analysis results now stored temporarily in session state
+- Data cleared on page reload (no persistence between sessions)
+- Application now fully compatible with DevPod deployment environment
 
 ### Known Issues & Solutions
 - **Azure OpenAI 403 Firewall Error**: Common issue when Azure OpenAI has network restrictions
