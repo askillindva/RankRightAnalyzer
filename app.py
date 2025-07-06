@@ -97,7 +97,7 @@ def auto_play_summary_audio(summary_text):
             # Clean up WAV file
             os.unlink(wav_path)
             
-        st.markdown("🎧 **Auto-playing summary audio:**", unsafe_allow_html=True)
+        st.markdown("🎧 **- Smart Narration of Key Points:**", unsafe_allow_html=True)
         st.markdown(audio_html, unsafe_allow_html=True)
         
     except subprocess.CalledProcessError:
