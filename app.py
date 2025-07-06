@@ -745,51 +745,54 @@ def show_analysis_results():
         - Total Areas for Improvement: **{overall_ranking['ranking_breakdown']['Amber'] + overall_ranking['ranking_breakdown']['Red']}**
         """)
     
-    # Action recommendations
-    st.subheader("🎯 Recommended Next Steps")
-    if ranking_color == 'Green':
-        st.info("✅ This document meets high quality standards. Consider minor refinements based on individual criterion feedback.")
-    elif ranking_color == 'Amber':
-        st.info("📈 Focus on improving Amber and Red criteria. Prioritize the Red issues first for maximum impact.")
-    else:
-        st.info("🔧 Immediate action required. Address all Red criteria before proceeding. Consider comprehensive document revision.")
+    # Future Enhancements section
+    st.subheader("🚀 Future Enhancements")
+    st.markdown("*Exciting features coming soon to enhance your document analysis experience:*")
     
-    # Auto-generate AI-revised document
-    analysis_id = analysis_data['analysis_id']
-    revised_document_key = f'revised_document_{analysis_id}'
-    if revised_document_key not in st.session_state:
-        with st.spinner("Generating AI-revised document based on evaluation feedback..."):
-            try:
-                revised_document = generate_ai_revised_document(analysis_data)
-                st.session_state[revised_document_key] = revised_document
-            except Exception as e:
-                st.error(f"Failed to generate revised document: {str(e)}")
-                st.session_state[revised_document_key] = "Error generating revised document. Please try again."
+    # Create three columns for the future features
+    col1, col2, col3 = st.columns(3)
     
-    # Display AI-revised document
-    st.subheader("📄 AI-Revised Document")
-    st.markdown("*Based on the evaluation criteria feedback, here's an improved version of your document:*")
-    
-    revised_content = st.session_state.get(revised_document_key, "")
-    
-    # Display in expandable text area
-    with st.expander("View AI-Revised Document", expanded=True):
-        st.text_area("Revised Content", revised_content, height=400, disabled=True, key=f"revised_text_{analysis_id}")
-    
-    # Download button for revised document as Word file
-    col1, col2 = st.columns([1, 2])
     with col1:
-        # Create Word document
-        word_doc_bytes = create_word_document(revised_content, analysis_id)
-        st.download_button(
-            label="📥 Download Revised Document (Word)",
-            data=word_doc_bytes,
-            file_name=f"revised_document_{analysis_id}.docx",
-            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-            use_container_width=True
+        st.markdown("**Generate AI-Revised Document**")
+        st.markdown("Automatically fill in the identified gaps using AI.")
+        st.button(
+            "🤖 Generate AI-Revised Document",
+            disabled=True,
+            use_container_width=True,
+            help="Coming soon: AI-powered document revision based on evaluation feedback"
         )
+    
     with col2:
-        st.markdown("*The revised document addresses all feedback points from the evaluation criteria.*")
+        st.markdown("**Upload AI-Revised Document to Confluence**")
+        st.markdown("Seamlessly publish the revised document to the user's Confluence space.")
+        st.button(
+            "📤 Upload to Confluence",
+            disabled=True,
+            use_container_width=True,
+            help="Coming soon: Direct integration with Confluence for seamless publishing"
+        )
+    
+    with col3:
+        st.markdown("**Generate AI-Video Summary**")
+        st.markdown("Create a quick, engaging video to convey the key insights from the document.")
+        st.button(
+            "🎥 Generate Video Summary",
+            disabled=True,
+            use_container_width=True,
+            help="Coming soon: AI-generated video summaries of document insights"
+        )
+    
+    # Add styling for disabled buttons to appear grey
+    st.markdown("""
+    <style>
+    .stButton > button:disabled {
+        background-color: #f0f0f0 !important;
+        color: #999999 !important;
+        border-color: #cccccc !important;
+        cursor: not-allowed !important;
+    }
+    </style>
+    """, unsafe_allow_html=True)
 
 def show_history_page():
     """Display analysis history from session state"""
