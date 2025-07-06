@@ -120,7 +120,7 @@ class AzureOpenAIClient:
             )
         
         prompt = f"""
-        Create a very concise summary of this document in simple, everyday language. Keep it under {max_length} words. do not include any headers or subheaders and show the details in bullet points.
+        Create a very concise summary of this document in simple, everyday language. Keep it under {max_length} words. do not include any headers.
         Focus on:
         - Key purpose or goal, keep it under 100 words.
         - Areas of improvement in the document. keep it under 100 words.
