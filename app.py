@@ -23,16 +23,28 @@ def get_star_rating(score):
     return f"{filled_stars}{empty_stars}"
 
 def auto_play_summary_audio(summary_text):
-    """Generate and auto-play audio summary using gTTS"""
+    """Generate and auto-play audio summary using pyttsx3"""
     try:
-        from gtts import gTTS
+        import pyttsx3
         
-        # Create TTS object
-        tts = gTTS(text=summary_text, lang='en', slow=False)
+        # Initialize pyttsx3 engine
+        engine = pyttsx3.init()
+        
+        # Configure speech properties
+        engine.setProperty('rate', 150)    # Speed of speech
+        engine.setProperty('volume', 0.9)  # Volume level (0.0 to 1.0)
+        
+        # Get available voices and set to a clear one if available
+        voices = engine.getProperty('voices')
+        if voices:
+            # Try to use first available voice (usually system default)
+            engine.setProperty('voice', voices[0].id)
         
         # Create temporary audio file
-        with tempfile.NamedTemporaryFile(delete=False, suffix='.mp3') as tmp_file:
-            tts.save(tmp_file.name)
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.wav') as tmp_file:
+            # Save speech to file
+            engine.save_to_file(summary_text, tmp_file.name)
+            engine.runAndWait()
             
             # Read audio file and encode for playback
             with open(tmp_file.name, 'rb') as audio_file:
@@ -42,7 +54,7 @@ def auto_play_summary_audio(summary_text):
             # Create auto-playing audio HTML
             audio_html = f"""
             <audio controls autoplay style="width: 100%; margin-top: 10px;">
-                <source src="data:audio/mp3;base64,{audio_base64}" type="audio/mp3">
+                <source src="data:audio/wav;base64,{audio_base64}" type="audio/wav">
                 Your browser does not support the audio element.
             </audio>
             """
@@ -54,10 +66,10 @@ def auto_play_summary_audio(summary_text):
         os.unlink(tmp_file.name)
         
     except ImportError:
-        st.warning("Text-to-speech library not available. Please install gTTS.")
+        st.warning("Text-to-speech library not available. Please install pyttsx3.")
     except Exception as e:
         st.error(f"Audio generation failed: {str(e)}")
-        st.info("Please check your internet connection for text-to-speech service.")
+        st.info("Local text-to-speech service encountered an issue.")
 
 def generate_ai_revised_document(analysis_data):
     """
