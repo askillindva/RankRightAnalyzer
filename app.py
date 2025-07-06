@@ -7,12 +7,10 @@ import re
 import io
 import base64
 import tempfile
-from database import DatabaseManager
 from document_processor import DocumentProcessor
 from web_scraper import get_website_text_content
 from azure_openai_client import AzureOpenAIClient
 from evaluation_engine import EvaluationEngine
-from utils import generate_summary_stats, format_timestamp
 
 # Utility function for star ratings
 def get_star_rating(score):
@@ -235,27 +233,25 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Initialize components
+# Initialize components (no database)
 @st.cache_resource
 def init_components():
-    db_manager = DatabaseManager()
     doc_processor = DocumentProcessor()
     ai_client = AzureOpenAIClient()
     eval_engine = EvaluationEngine(ai_client)
-    return db_manager, doc_processor, ai_client, eval_engine
+    return doc_processor, ai_client, eval_engine
 
 # Initialize global components
 try:
-    db_manager, doc_processor, ai_client, eval_engine = init_components()
+    doc_processor, ai_client, eval_engine = init_components()
     # Verify eval_engine has the required method
     if not hasattr(eval_engine, 'calculate_overall_ranking'):
         st.error("Evaluation engine initialization issue detected. Reinitializing...")
         st.cache_resource.clear()
-        db_manager, doc_processor, ai_client, eval_engine = init_components()
+        doc_processor, ai_client, eval_engine = init_components()
 except Exception as e:
     st.error(f"Component initialization failed: {e}")
     # Manual initialization as fallback
-    db_manager = DatabaseManager()
     doc_processor = DocumentProcessor()
     ai_client = AzureOpenAIClient()
     eval_engine = EvaluationEngine(ai_client)
@@ -263,8 +259,10 @@ except Exception as e:
 # Session state initialization
 if 'analysis_complete' not in st.session_state:
     st.session_state.analysis_complete = False
-if 'current_analysis_id' not in st.session_state:
-    st.session_state.current_analysis_id = None
+if 'current_analysis_data' not in st.session_state:
+    st.session_state.current_analysis_data = None
+if 'analysis_history' not in st.session_state:
+    st.session_state.analysis_history = []
 
 def main():
     # Remove top padding and add compact layout CSS
@@ -390,7 +388,7 @@ def show_home_page():
                 del st.session_state.url_content
                 del st.session_state.url_source
                 st.session_state.analysis_complete = False
-                st.session_state.current_analysis_id = None
+                st.session_state.current_analysis_data = None
                 st.rerun()
     
     # Analysis section
@@ -404,8 +402,8 @@ def show_home_page():
             perform_analysis(content_text, source_info)
     
     # Show analysis results if available
-    if st.session_state.analysis_complete and st.session_state.current_analysis_id:
-        show_analysis_results(st.session_state.current_analysis_id)
+    if st.session_state.analysis_complete and st.session_state.current_analysis_data:
+        show_analysis_results()
 
 def perform_analysis(content_text, source_info):
     """Perform comprehensive document analysis"""
@@ -427,16 +425,23 @@ def perform_analysis(content_text, source_info):
         
         evaluation_results = eval_engine.evaluate_content(content_text)
         
-        # Step 3: Store results in database
+        # Step 3: Store results in session state
         status_text.text("Storing analysis results...")
         progress_bar.progress(80)
         
-        analysis_id = db_manager.store_analysis(
-            content=content_text,
-            source_info=source_info,
-            summary=summary,
-            evaluation_results=evaluation_results
-        )
+        # Create analysis data structure
+        analysis_data = {
+            'content': content_text,
+            'source_info': source_info,
+            'summary': summary,
+            'evaluation_results': evaluation_results,
+            'timestamp': datetime.now().isoformat(),
+            'analysis_id': f"analysis_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+        }
+        
+        # Store in session state
+        st.session_state.current_analysis_data = analysis_data
+        st.session_state.analysis_history.append(analysis_data)
         
         # Complete
         progress_bar.progress(100)
@@ -444,7 +449,6 @@ def perform_analysis(content_text, source_info):
         
         # Update session state
         st.session_state.analysis_complete = True
-        st.session_state.current_analysis_id = analysis_id
         
         st.success("✅ Analysis completed! Results are displayed below.")
         st.rerun()
@@ -484,13 +488,13 @@ def perform_analysis(content_text, source_info):
         else:
             st.error(f"Analysis failed: {error_msg}")
 
-def show_analysis_results(analysis_id):
-    """Display analysis results in tabs"""
+def show_analysis_results():
+    """Display analysis results from session state"""
     
-    # Get analysis data
-    analysis_data = db_manager.get_analysis(analysis_id)
+    # Get analysis data from session state
+    analysis_data = st.session_state.current_analysis_data
     if not analysis_data:
-        st.error("Analysis data not found")
+        st.error("No analysis data found")
         return
     
     # Calculate overall ranking - with fallback method
@@ -611,7 +615,7 @@ def show_analysis_results(analysis_id):
     st.markdown(table_html, unsafe_allow_html=True)
     
     # Auto-play summary audio after analysis completion
-    audio_key = f"audio_played_{analysis_id}"
+    audio_key = f"audio_played_{analysis_data['analysis_id']}"
     if audio_key not in st.session_state:
         st.session_state[audio_key] = False
     
@@ -751,6 +755,7 @@ def show_analysis_results(analysis_id):
         st.info("🔧 Immediate action required. Address all Red criteria before proceeding. Consider comprehensive document revision.")
     
     # Auto-generate AI-revised document
+    analysis_id = analysis_data['analysis_id']
     revised_document_key = f'revised_document_{analysis_id}'
     if revised_document_key not in st.session_state:
         with st.spinner("Generating AI-revised document based on evaluation feedback..."):
@@ -787,11 +792,11 @@ def show_analysis_results(analysis_id):
         st.markdown("*The revised document addresses all feedback points from the evaluation criteria.*")
 
 def show_history_page():
-    """Display analysis history"""
+    """Display analysis history from session state"""
     st.header("📚 Analysis History")
     
-    # Get all analyses
-    analyses = db_manager.get_all_analyses()
+    # Get analyses from session state
+    analyses = st.session_state.get('analysis_history', [])
     
     if not analyses:
         st.info("No analyses found. Start by analyzing a document on the Home page.")
@@ -799,33 +804,47 @@ def show_history_page():
     
     # Create summary table
     df_data = []
-    for analysis in analyses:
+    for i, analysis in enumerate(analyses):
+        timestamp_str = analysis.get('timestamp', datetime.now().isoformat())
+        try:
+            # Parse ISO format timestamp
+            timestamp_dt = datetime.fromisoformat(timestamp_str.replace('Z', '+00:00'))
+            formatted_timestamp = timestamp_dt.strftime('%Y-%m-%d %H:%M')
+        except:
+            formatted_timestamp = timestamp_str[:16]  # Fallback
+            
         df_data.append({
-            'ID': analysis['id'],
+            'Index': i,
             'Source': analysis['source_info'][:50] + "..." if len(analysis['source_info']) > 50 else analysis['source_info'],
-            'Timestamp': format_timestamp(analysis['timestamp']),
+            'Timestamp': formatted_timestamp,
             'Summary': analysis['summary'][:100] + "..." if len(analysis['summary']) > 100 else analysis['summary']
         })
     
     df = pd.DataFrame(df_data)
     
     # Display table with selection
-    selected_indices = st.dataframe(
-        df,
-        use_container_width=True,
-        hide_index=True,
-        on_select="rerun",
-        selection_mode="single-row"
-    )
-    
-    # Show detailed view for selected analysis
-    if selected_indices['selection']['rows']:
-        selected_idx = selected_indices['selection']['rows'][0]
-        selected_id = df.iloc[selected_idx]['ID']
+    if len(df) > 0:
+        selected_indices = st.dataframe(
+            df.drop('Index', axis=1),  # Hide index column
+            use_container_width=True,
+            hide_index=True,
+            on_select="rerun",
+            selection_mode="single-row"
+        )
         
-        st.divider()
-        st.subheader(f"Analysis Details - ID: {selected_id}")
-        show_analysis_results(selected_id)
+        # Show detailed view for selected analysis
+        if selected_indices.get('selection', {}).get('rows'):
+            selected_idx = selected_indices['selection']['rows'][0]
+            selected_analysis = analyses[selected_idx]
+            
+            st.divider()
+            st.subheader(f"Analysis Details - {selected_analysis['analysis_id']}")
+            
+            # Temporarily set as current analysis for display
+            temp_current = st.session_state.current_analysis_data
+            st.session_state.current_analysis_data = selected_analysis
+            show_analysis_results()
+            st.session_state.current_analysis_data = temp_current
 
 def show_settings_page():
     """Display settings and configuration"""
@@ -994,19 +1013,21 @@ def show_settings_page():
         except Exception as e:
             st.error(f"Could not detect current IP: {str(e)}")
     
-    # Database settings
-    st.subheader("Database")
-    with st.expander("Database Information"):
-        st.info("Using SQLite database for local storage")
+    # Session Data Management
+    st.subheader("Session Data")
+    with st.expander("Session Information"):
+        st.info("Using session state for temporary storage (data cleared on page reload)")
         
-        # Database stats
-        analyses_count = len(db_manager.get_all_analyses())
-        st.metric("Total Analyses", analyses_count)
+        # Session stats
+        analyses_count = len(st.session_state.get('analysis_history', []))
+        st.metric("Current Session Analyses", analyses_count)
         
-        if st.button("Clear All Data", type="secondary"):
-            if st.warning("This will delete all analysis data. Are you sure?"):
-                db_manager.clear_all_data()
-                st.success("All data cleared!")
+        if st.button("Clear Session Data", type="secondary"):
+            if st.checkbox("Confirm: Delete all analysis data from this session"):
+                st.session_state.analysis_history = []
+                st.session_state.current_analysis_data = None
+                st.session_state.analysis_complete = False
+                st.success("Session data cleared!")
                 st.rerun()
     
     # Evaluation Criteria
