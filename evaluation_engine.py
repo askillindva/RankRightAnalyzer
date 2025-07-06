@@ -12,28 +12,26 @@ class EvaluationEngine:
         """Initialize the 6 predefined evaluation criteria"""
         
         return {
-            "Clarity & Readability": """
+            "Clarity & Readability": """            
             Evaluate how clear, understandable, and accessible the content is to its intended audience. 
             Consider language complexity, sentence structure, jargon usage, and overall readability. 
             Assess whether the content effectively communicates its message without ambiguity.
+            Check if the document references to any sub documents. If yes, then the scoring must impact if the sub documents are accessible.
+            visual representation of key terms, and overall presentation style.
             """,
             
             "Completeness & Coverage": """
+            Check the document or link updated date. If the document or link is not updated in the last 12 months, then the scoring must impact.
             Assess whether the document thoroughly covers all necessary topics and provides comprehensive information. 
             Evaluate if all required sections are present, if key information is missing, and whether the depth 
             of coverage is appropriate for the document's purpose.
             """,
             
             "Accuracy & Reliability": """
+            Check if there are any deadlinks or broken links in the document, the scoring must impact if there are any deadlinks or broken links.
             Evaluate the factual accuracy, consistency, and reliability of the information presented. 
             Look for contradictions, outdated information, unsupported claims, and verify that 
             statements are backed by appropriate evidence or sources.
-            """,
-            
-            "Structure & Organization": """
-            Assess the logical flow, organization, and structure of the document. 
-            Evaluate heading hierarchy, paragraph organization, use of lists and tables, 
-            and whether the content follows a logical sequence that aids comprehension.
             """,
             
             "Compliance & Standards": """

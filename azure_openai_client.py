@@ -122,11 +122,10 @@ class AzureOpenAIClient:
         prompt = f"""
         Create a very concise summary of this document in simple, everyday language. Keep it under {max_length} words.
         Focus on:
-        - What the document is about (main topic)
-        - Key purpose or goal
-        - Who would use this document
+        - Key purpose or goal, keep it under 100 words.
+        - Areas of improvement. keep it under 100 words.
         
-        Write in plain language that anyone can understand. No technical jargon.
+        Write in plain language that anyone can understand. Avoid technical jargon.
         
         Content:
         {content}
