@@ -18,8 +18,8 @@ from utils import generate_summary_stats, format_timestamp
 def get_star_rating(score):
     """Convert score to star rating display"""
     stars = int(round(score / 2))  # Convert 0-10 to 0-5 stars
-    filled_stars = "⭐" * stars
-    empty_stars = "☆" * (5 - stars)
+    filled_stars = "★" * stars  # Black filled stars
+    empty_stars = "☆" * (5 - stars)  # Empty stars
     return f"{filled_stars}{empty_stars}"
 
 def auto_play_summary_audio(summary_text):
