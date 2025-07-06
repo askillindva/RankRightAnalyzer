@@ -812,7 +812,7 @@ def show_history_page():
     # Get analyses from session state
     analyses = st.session_state.get('analysis_history', [])
     
-    # Add clear button
+    # Add clear button and data size info
     col1, col2 = st.columns([1, 4])
     with col1:
         if st.button("🗑️ Clear History", type="secondary"):
@@ -821,6 +821,31 @@ def show_history_page():
             st.session_state.analysis_complete = False
             st.success("History cleared!")
             st.rerun()
+    
+    with col2:
+        # Calculate total data size
+        if analyses:
+            import json
+            import sys
+            
+            # Calculate approximate size of analysis data
+            total_size = 0
+            for analysis in analyses:
+                # Convert to JSON string to get approximate size
+                analysis_json = json.dumps(analysis, default=str)
+                total_size += sys.getsizeof(analysis_json)
+            
+            # Format size in human readable format
+            if total_size < 1024:
+                size_str = f"{total_size} bytes"
+            elif total_size < 1024 * 1024:
+                size_str = f"{total_size / 1024:.1f} KB"
+            else:
+                size_str = f"{total_size / (1024 * 1024):.1f} MB"
+            
+            st.info(f"📊 **Session Data Size**: {size_str} ({len(analyses)} analyses)")
+        else:
+            st.info("📊 **Session Data Size**: 0 bytes (no analyses)")
     
     if not analyses:
         st.info("No analyses found. Start by analyzing a document on the Home page.")
