@@ -1,8 +1,29 @@
+# Core Web Application Framework
 streamlit>=1.46.1
+
+# AI Integration (Azure OpenAI)
 openai>=1.93.0
+
+# Data Processing and Visualization
 pandas>=2.3.0
 plotly>=6.2.0
+
+# Document Processing
 pypdf2>=3.0.1
 python-docx>=1.2.0
+
+# Web Content Extraction
 trafilatura>=2.0.0
 requests>=2.32.4
+
+# Note: Built-in Python modules used (no installation required):
+# - json (JSON data handling)
+# - os (Operating system interface)
+# - tempfile (Temporary file management)
+# - datetime (Date/time operations)
+# - typing (Type annotations)
+# - base64 (Base64 encoding/decoding)
+# - io (Input/output operations)
+# - re (Regular expressions)
+# - sys (System-specific parameters)
+# - subprocess (Process management for audio generation)
