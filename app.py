@@ -23,32 +23,26 @@ def get_star_rating(score):
     return f"{filled_stars}{empty_stars}"
 
 def auto_play_summary_audio(summary_text):
-    """Generate and auto-play audio summary using pyttsx3"""
+    """Generate and auto-play audio summary using espeak"""
     try:
-        import pyttsx3
         import subprocess
-        
-        # Initialize pyttsx3 engine
-        engine = pyttsx3.init()
-        
-        # Configure speech properties
-        engine.setProperty('rate', 150)    # Speed of speech
-        engine.setProperty('volume', 0.9)  # Volume level (0.0 to 1.0)
-        
-        # Get available voices and set to a clear one if available
-        voices = engine.getProperty('voices')
-        if voices:
-            # Try to use first available voice (usually system default)
-            engine.setProperty('voice', voices[0].id)
         
         # Create temporary WAV file
         wav_file = tempfile.NamedTemporaryFile(delete=False, suffix='.wav')
         wav_path = wav_file.name
         wav_file.close()
         
-        # Save speech to WAV file
-        engine.save_to_file(summary_text, wav_path)
-        engine.runAndWait()
+        # Generate speech using espeak
+        espeak_cmd = [
+            'espeak',
+            '-s', '150',  # Speed (words per minute)
+            '-a', '100',  # Amplitude (volume)
+            '-v', 'en',   # Voice (English)
+            '-w', wav_path,  # Write to WAV file
+            summary_text
+        ]
+        
+        subprocess.run(espeak_cmd, check=True, capture_output=True)
         
         try:
             # Try to convert WAV to MP3 using ffmpeg if available
@@ -96,11 +90,11 @@ def auto_play_summary_audio(summary_text):
         st.markdown("🎧 **Auto-playing summary audio:**", unsafe_allow_html=True)
         st.markdown(audio_html, unsafe_allow_html=True)
         
-    except ImportError:
-        st.warning("Text-to-speech library not available. Please install pyttsx3.")
+    except subprocess.CalledProcessError:
+        st.warning("espeak text-to-speech engine not available. Please install espeak.")
     except Exception as e:
         st.error(f"Audio generation failed: {str(e)}")
-        st.info("Local text-to-speech service encountered an issue.")
+        st.info("Text-to-speech service encountered an issue.")
 
 def generate_ai_revised_document(analysis_data):
     """
