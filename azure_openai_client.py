@@ -120,7 +120,7 @@ class AzureOpenAIClient:
             )
         
         prompt = f"""
-        Create a very concise summary of this document in simple, everyday language. Keep it under {max_length} words. Replace Key purpose or goal with the purpose of the document and Areas of improvement in the document with Suggested improvments in the document.
+        Create a very concise summary of this document in simple, everyday language. Keep it under {max_length} words. Replace Key purpose or goal with the purpose of the document and Areas of improvement in the document with Suggested improvments in the document. Do not include ** in the headers. 
         Focus on:
         - Key purpose or goal, keep it under 100 words.
         - Areas of improvement in the document. keep it under 100 words.
