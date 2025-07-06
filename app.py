@@ -32,14 +32,15 @@ def auto_play_summary_audio(summary_text):
         wav_path = wav_file.name
         wav_file.close()
         
-        # Generate speech using espeak with improved quality settings
+        # Generate speech using espeak with much slower, clearer settings
         espeak_cmd = [
             'espeak',
-            '-s', '140',      # Slower speed for clarity (words per minute)
-            '-a', '80',       # Moderate amplitude 
-            '-p', '50',       # Pitch variation (0-99, 50 is normal)
-            '-g', '10',       # Gap between words (10ms)
-            '-v', 'en+f3',    # Female voice variant for clarity
+            '-s', '120',      # Much slower speed for better clarity (words per minute)
+            '-a', '60',       # Lower amplitude to reduce harshness
+            '-p', '40',       # Lower pitch for more natural sound
+            '-g', '15',       # Longer gaps between words (15ms)
+            '-v', 'en+f4',    # Different female voice variant
+            '-k', '5',        # Emphasis on stressed syllables
             '-w', wav_path,   # Write to WAV file
             summary_text
         ]
@@ -52,12 +53,13 @@ def auto_play_summary_audio(summary_text):
             mp3_path = mp3_file.name
             mp3_file.close()
             
-            # Enhanced ffmpeg command with audio filters for better quality
+            # Enhanced ffmpeg command with comprehensive audio filters
             ffmpeg_cmd = [
                 'ffmpeg', '-i', wav_path,
-                '-af', 'highpass=f=80,lowpass=f=8000,volume=1.2',  # Audio filters
+                '-af', 'highpass=f=100,lowpass=f=7000,volume=1.1,dynaudnorm=f=75:g=25',  # Better audio filters
                 '-codec:a', 'mp3',
-                '-b:a', '128k',  # Higher bitrate for better quality
+                '-b:a', '160k',  # Even higher bitrate for better quality
+                '-ar', '44100',  # Standard sample rate
                 mp3_path, '-y'
             ]
             
