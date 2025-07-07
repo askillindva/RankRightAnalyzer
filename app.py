@@ -922,6 +922,80 @@ def show_settings_page():
                 except Exception as e:
                     st.error(f"❌ Connection test failed: {str(e)}")
     
+    # Debug Information Section
+    st.subheader("🐛 Debug Information")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        if st.button("Show Debug Summary"):
+            try:
+                from azure_openai_client import AzureOpenAIClient
+                client = AzureOpenAIClient()
+                debug_summary = client.get_debug_summary()
+                st.text_area("Debug Summary", debug_summary, height=400)
+            except Exception as e:
+                st.error(f"Failed to get debug summary: {str(e)}")
+    
+    with col2:
+        if st.button("Show Debug Logs"):
+            try:
+                from azure_openai_client import AzureOpenAIClient
+                client = AzureOpenAIClient()
+                debug_logs = client.get_debug_logs()
+                
+                st.write(f"**Total Logs:** {len(debug_logs)}")
+                
+                for i, log in enumerate(debug_logs[-10:]):  # Show last 10 logs
+                    with st.expander(f"Log {i+1}: {log['action']} - {log['timestamp']}"):
+                        st.json(log['details'])
+                        
+            except Exception as e:
+                st.error(f"Failed to get debug logs: {str(e)}")
+    
+    # Test API Request Section
+    st.subheader("🧪 Test API Request")
+    
+    test_prompt = st.text_area(
+        "Enter test prompt:", 
+        value="Hello, can you confirm you are working properly?",
+        height=100
+    )
+    
+    if st.button("Send Test Request"):
+        if test_prompt.strip():
+            try:
+                from azure_openai_client import AzureOpenAIClient
+                client = AzureOpenAIClient()
+                
+                with st.spinner("Sending test request..."):
+                    response = client._make_api_request(test_prompt)
+                
+                st.success("✅ Request successful!")
+                st.text_area("Response:", response, height=200)
+                
+                # Show debug info for this request
+                with st.expander("Debug Info for this request"):
+                    if hasattr(client, 'last_request_info'):
+                        st.json(client.last_request_info)
+                        
+            except Exception as e:
+                st.error(f"❌ Request failed: {str(e)}")
+                
+                # Show debug logs when request fails
+                try:
+                    from azure_openai_client import AzureOpenAIClient
+                    client = AzureOpenAIClient()
+                    debug_logs = client.get_debug_logs()
+                    if debug_logs:
+                        with st.expander("Latest Debug Logs"):
+                            for log in debug_logs[-3:]:  # Show last 3 logs
+                                st.json(log)
+                except:
+                    pass
+        else:
+            st.warning("Please enter a test prompt.")
+    
     # Network Information
     st.subheader("Network Information")
     with st.expander("Current Network Details"):

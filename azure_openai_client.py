@@ -3,6 +3,9 @@ import json
 import requests
 from typing import Dict, List, Any, Optional
 import streamlit as st
+import logging
+import traceback
+from datetime import datetime
 
 class AzureOpenAIClient:
     """Client for interacting with Azure OpenAI services via custom API"""
@@ -30,9 +33,20 @@ class AzureOpenAIClient:
                 "Azure OpenAI configuration missing. Please set AZURE_OPENAI_API_KEY environment variable."
             )
         
-        # Initialize client
+        # Initialize client and debugging
         self.connection_working = False
         self.client = None
+        self.debug_logs = []
+        self.last_request_info = {}
+        
+        self._log_debug("Azure OpenAI Client Initialization", {
+            "url": self.url,
+            "has_api_key": bool(self.api_key),
+            "api_key_prefix": self.api_key[:8] + "..." if self.api_key else "None",
+            "host": self.host,
+            "deployment_name": self.deployment_name,
+            "api_version": self.api_version
+        })
         
         try:
             # Test connection with your API structure
@@ -48,27 +62,70 @@ class AzureOpenAIClient:
                 ]
             }
             
+            self._log_debug("Sending test request", {
+                "url": self.url,
+                "headers": {"api-key": f"{self.api_key[:8]}..." if self.api_key else "None"},
+                "data": data
+            })
+            
             response = requests.post(
                 self.url, 
                 headers={"api-key": self.api_key}, 
                 json=data, 
-                verify=False
+                verify=False,
+                timeout=30
             )
+            
+            self._log_debug("Response received", {
+                "status_code": response.status_code,
+                "headers": dict(response.headers),
+                "response_text": response.text[:500] + "..." if len(response.text) > 500 else response.text
+            })
             
             if response.status_code == 200:
                 self.connection_working = True
                 self.client = response.json()
+                self._log_debug("Connection successful", {"response": self.client})
                 print("Azure OpenAI client initialized successfully")
             else:
-                raise Exception(f"Request failed with status code: {response.status_code}")
+                error_msg = f"Request failed with status code: {response.status_code}, Response: {response.text}"
+                self._log_debug("Connection failed", {"error": error_msg})
+                raise Exception(error_msg)
                 
         except Exception as e:
+            error_details = {
+                "error": str(e),
+                "traceback": traceback.format_exc(),
+                "url": self.url,
+                "has_api_key": bool(self.api_key)
+            }
+            self._log_debug("Initialization failed", error_details)
             print(f"Azure OpenAI client initialization failed: {str(e)}")
             self.client = None
             self.connection_working = False
     
+    def _log_debug(self, action: str, details: Dict[str, Any]) -> None:
+        """Log debug information with timestamp"""
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        log_entry = {
+            "timestamp": timestamp,
+            "action": action,
+            "details": details
+        }
+        self.debug_logs.append(log_entry)
+        
+        # Keep only last 20 logs to prevent memory issues
+        if len(self.debug_logs) > 20:
+            self.debug_logs = self.debug_logs[-20:]
+    
+    def get_debug_logs(self) -> List[Dict[str, Any]]:
+        """Get debug logs for troubleshooting"""
+        return self.debug_logs
+    
     def _make_api_request(self, content: str, system_prompt: str = None) -> str:
         """Make API request using your custom format"""
+        request_id = datetime.now().strftime("%H:%M:%S.%f")
+        
         try:
             # Build request data in your API format
             question_content = [
@@ -85,30 +142,106 @@ class AzureOpenAIClient:
                 ]
             }
             
+            # Log request details
+            self._log_debug(f"API Request {request_id}", {
+                "url": self.url,
+                "content_length": len(content),
+                "has_system_prompt": bool(system_prompt),
+                "system_prompt_length": len(system_prompt) if system_prompt else 0,
+                "data": data,
+                "headers": {"api-key": f"{self.api_key[:8]}..." if self.api_key else "None"}
+            })
+            
+            # Store request info for debugging
+            self.last_request_info = {
+                "request_id": request_id,
+                "timestamp": datetime.now().isoformat(),
+                "url": self.url,
+                "data": data
+            }
+            
             response = requests.post(
                 self.url,
                 headers={"api-key": self.api_key},
                 json=data,
-                verify=False
+                verify=False,
+                timeout=60
             )
+            
+            # Log response details
+            self._log_debug(f"API Response {request_id}", {
+                "status_code": response.status_code,
+                "response_headers": dict(response.headers),
+                "response_length": len(response.text),
+                "response_text": response.text[:1000] + "..." if len(response.text) > 1000 else response.text
+            })
             
             if response.status_code == 200:
                 result = response.json()
+                
+                self._log_debug(f"Response Parsed {request_id}", {
+                    "result_type": type(result).__name__,
+                    "result_keys": list(result.keys()) if isinstance(result, dict) else "Not a dict",
+                    "result_structure": str(result)[:500] + "..." if len(str(result)) > 500 else str(result)
+                })
+                
                 # Extract the response content from your API's response format
-                # You may need to adjust this based on your actual response structure
-                if isinstance(result, dict) and 'response' in result:
-                    return result['response']
-                elif isinstance(result, dict) and 'content' in result:
-                    return result['content']
-                elif isinstance(result, dict) and 'message' in result:
-                    return result['message']
-                else:
-                    # If the structure is different, return the whole response as string
-                    return json.dumps(result) if isinstance(result, dict) else str(result)
+                extracted_content = None
+                
+                # Try different possible response structures
+                if isinstance(result, dict):
+                    # Try common response field names
+                    for field in ['response', 'content', 'message', 'answer', 'text', 'result', 'data']:
+                        if field in result:
+                            extracted_content = result[field]
+                            self._log_debug(f"Content Extracted {request_id}", {
+                                "field_used": field,
+                                "content_type": type(extracted_content).__name__,
+                                "content_preview": str(extracted_content)[:200] + "..." if len(str(extracted_content)) > 200 else str(extracted_content)
+                            })
+                            break
+                    
+                    # If no common field found, try to find text content in nested structures
+                    if extracted_content is None:
+                        if 'choices' in result and len(result['choices']) > 0:
+                            choice = result['choices'][0]
+                            if 'message' in choice and 'content' in choice['message']:
+                                extracted_content = choice['message']['content']
+                            elif 'text' in choice:
+                                extracted_content = choice['text']
+                        
+                        if extracted_content:
+                            self._log_debug(f"Content From Choices {request_id}", {
+                                "content_preview": str(extracted_content)[:200] + "..." if len(str(extracted_content)) > 200 else str(extracted_content)
+                            })
+                
+                # If still no content found, return the whole response
+                if extracted_content is None:
+                    extracted_content = json.dumps(result) if isinstance(result, dict) else str(result)
+                    self._log_debug(f"Using Full Response {request_id}", {
+                        "reason": "No standard content field found",
+                        "content_preview": str(extracted_content)[:200] + "..." if len(str(extracted_content)) > 200 else str(extracted_content)
+                    })
+                
+                return str(extracted_content)
             else:
-                raise Exception(f"API request failed with status code: {response.status_code}")
+                error_msg = f"API request failed with status code: {response.status_code}, Response: {response.text}"
+                self._log_debug(f"Request Failed {request_id}", {
+                    "status_code": response.status_code,
+                    "response_text": response.text,
+                    "error": error_msg
+                })
+                raise Exception(error_msg)
                 
         except Exception as e:
+            error_details = {
+                "error": str(e),
+                "traceback": traceback.format_exc(),
+                "request_id": request_id,
+                "url": self.url,
+                "has_api_key": bool(self.api_key)
+            }
+            self._log_debug(f"Request Exception {request_id}", error_details)
             raise Exception(f"API request failed: {str(e)}")
     
     def get_connection_info(self) -> Dict[str, Any]:
@@ -256,12 +389,53 @@ Requirements:
     def test_connection(self) -> tuple[bool, str]:
         """Test the Azure OpenAI connection"""
         
+        self._log_debug("Connection Test Started", {
+            "connection_working": self.connection_working,
+            "has_client": self.client is not None
+        })
+        
         if not self.connection_working or self.client is None:
             return False, "Client not initialized properly"
         
         try:
             # Test with a simple request
             test_response = self._make_api_request("Test connection - please respond with 'Connection successful'")
+            
+            self._log_debug("Connection Test Completed", {
+                "success": True,
+                "response_length": len(test_response),
+                "response_preview": test_response[:100] + "..." if len(test_response) > 100 else test_response
+            })
+            
             return True, f"Connection successful. Response: {test_response[:100]}..."
         except Exception as e:
+            self._log_debug("Connection Test Failed", {
+                "error": str(e),
+                "traceback": traceback.format_exc()
+            })
             return False, f"Connection test failed: {str(e)}"
+    
+    def get_debug_summary(self) -> str:
+        """Get a formatted debug summary for troubleshooting"""
+        summary = []
+        summary.append("=== Azure OpenAI Client Debug Summary ===")
+        summary.append(f"Connection Status: {'Connected' if self.connection_working else 'Disconnected'}")
+        summary.append(f"URL: {self.url}")
+        summary.append(f"Host: {self.host}")
+        summary.append(f"Deployment: {self.deployment_name}")
+        summary.append(f"API Key: {'Set' if self.api_key else 'Missing'} ({self.api_key[:8]}... if set)")
+        summary.append(f"Total Debug Logs: {len(self.debug_logs)}")
+        
+        if self.last_request_info:
+            summary.append(f"\nLast Request: {self.last_request_info.get('timestamp', 'Unknown')}")
+            summary.append(f"Request ID: {self.last_request_info.get('request_id', 'Unknown')}")
+        
+        summary.append("\n=== Recent Debug Logs ===")
+        for log in self.debug_logs[-5:]:  # Show last 5 logs
+            summary.append(f"[{log['timestamp']}] {log['action']}")
+            if isinstance(log['details'], dict):
+                for key, value in log['details'].items():
+                    if key not in ['traceback', 'response_text']:  # Skip verbose details
+                        summary.append(f"  {key}: {str(value)[:100]}...")
+        
+        return "\n".join(summary)
