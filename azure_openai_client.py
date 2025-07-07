@@ -4,292 +4,211 @@ import requests
 from typing import Dict, List, Any, Optional
 import streamlit as st
 
-# Azure OpenAI client
-try:
-    from openai import AzureOpenAI
-except ImportError:
-    AzureOpenAI = None
-
 class AzureOpenAIClient:
-    """Client for interacting with Azure OpenAI services"""
+    """Client for interacting with Azure OpenAI services via custom API"""
     
     def __init__(self):
         """Initialize Azure OpenAI client with environment variables"""
         
-        if AzureOpenAI is None:
-            raise ImportError("openai library is required for Azure OpenAI integration")
-        
-        # Get configuration from environment variables
-        self.endpoint = os.getenv("AZURE_OPENAI_ENDPOINT", "")
-        self.api_key = os.getenv("AZURE_OPENAI_API_KEY", "")
+        # Get configuration from environment variables (note the typos in your env file)
+        self.api_key = os.getenv("AZURE_OPENAI_API_KEY") or os.getenv("AZURE_OPENAT_API_KEY")
+        self.host = os.getenv("AZURE_OPENAI_HOST")
+        self.deployment_name = os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME") or os.getenv("AZURE_OPENAT_DEPLOYMENT_NAME")
+        self.endpoint = os.getenv("AZURE_OPENAI_ENDPOINT")
         self.api_version = os.getenv("AZURE_OPENAI_API_VERSION", "2024-02-01")
-        self.deployment_name = os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME", "RankRightAnalyzer")
         
-        # Private endpoint configuration
-        self.use_private_endpoint = os.getenv("AZURE_OPENAI_USE_PRIVATE_ENDPOINT", "false").lower() == "true"
-        self.private_endpoint_ip = os.getenv("AZURE_OPENAI_PRIVATE_IP", "")
-        self.private_endpoint_fqdn = os.getenv("AZURE_OPENAI_PRIVATE_FQDN", "")
-        
-        if not self.endpoint or not self.api_key:
-            raise ValueError(
-                "Azure OpenAI configuration missing. Please set AZURE_OPENAI_ENDPOINT "
-                "and AZURE_OPENAI_API_KEY environment variables."
-            )
-        
-        # Initialize client with private endpoint support
-        try:
-            # Configure endpoint for private endpoint if enabled
-            endpoint_url = self._get_effective_endpoint()
-            
-            self.client = AzureOpenAI(
-                azure_endpoint=endpoint_url,
-                api_key=self.api_key,
-                api_version=self.api_version
-            )
-            self.connection_working = True
-        except Exception as e:
-            st.warning(f"Azure OpenAI client initialization failed: {str(e)}")
-            self.connection_working = False
-            self.client = None
-    
-    def _get_effective_endpoint(self) -> str:
-        """
-        Get the effective endpoint URL, considering private endpoint configuration.
-        
-        Returns:
-            The endpoint URL to use for connections
-        """
-        if self.use_private_endpoint and self.private_endpoint_ip:
-            # Replace the hostname in the endpoint with the private IP
-            import urllib.parse
-            parsed = urllib.parse.urlparse(self.endpoint)
-            
-            # Build the private endpoint URL
-            if self.private_endpoint_fqdn:
-                # Use custom FQDN if provided
-                private_endpoint = f"{parsed.scheme}://{self.private_endpoint_fqdn}{parsed.path}"
-            else:
-                # Use IP address directly
-                private_endpoint = f"{parsed.scheme}://{self.private_endpoint_ip}{parsed.path}"
-            
-            return private_endpoint
+        # Build URL from host and deployment name
+        if self.host and self.deployment_name:
+            self.url = f"https://{self.host}/api/v1/{self.deployment_name}/chat"
+        elif self.endpoint:
+            self.url = self.endpoint
         else:
-            # Use the standard public endpoint
-            return self.endpoint
+            raise ValueError("Either AZURE_OPENAI_HOST and AZURE_OPENAI_DEPLOYMENT_NAME or AZURE_OPENAI_ENDPOINT must be set")
+        
+        if not self.api_key:
+            raise ValueError(
+                "Azure OpenAI configuration missing. Please set AZURE_OPENAI_API_KEY environment variable."
+            )
+        
+        # Initialize client
+        self.connection_working = False
+        self.client = None
+        
+        try:
+            # Test connection with your API structure
+            data = {
+                "questionContent": [
+                    {
+                        "type": "text",
+                        "value": "Hey Can you tell me if you are working well?"
+                    }
+                ],
+                "chatBotIds": [
+                    "faebedce-b075-42aa-9130-bf109d2d8d91"
+                ]
+            }
+            
+            response = requests.post(
+                self.url, 
+                headers={"api-key": self.api_key}, 
+                json=data, 
+                verify=False
+            )
+            
+            if response.status_code == 200:
+                self.connection_working = True
+                self.client = response.json()
+                print("Azure OpenAI client initialized successfully")
+            else:
+                raise Exception(f"Request failed with status code: {response.status_code}")
+                
+        except Exception as e:
+            print(f"Azure OpenAI client initialization failed: {str(e)}")
+            self.client = None
+            self.connection_working = False
+    
+    def _make_api_request(self, content: str, system_prompt: str = None) -> str:
+        """Make API request using your custom format"""
+        try:
+            # Build request data in your API format
+            question_content = [
+                {
+                    "type": "text",
+                    "value": content if not system_prompt else f"{system_prompt}\n\n{content}"
+                }
+            ]
+            
+            data = {
+                "questionContent": question_content,
+                "chatBotIds": [
+                    "faebedce-b075-42aa-9130-bf109d2d8d91"
+                ]
+            }
+            
+            response = requests.post(
+                self.url,
+                headers={"api-key": self.api_key},
+                json=data,
+                verify=False
+            )
+            
+            if response.status_code == 200:
+                result = response.json()
+                # Extract the response content from your API's response format
+                # You may need to adjust this based on your actual response structure
+                if isinstance(result, dict) and 'response' in result:
+                    return result['response']
+                elif isinstance(result, dict) and 'content' in result:
+                    return result['content']
+                elif isinstance(result, dict) and 'message' in result:
+                    return result['message']
+                else:
+                    # If the structure is different, return the whole response as string
+                    return json.dumps(result) if isinstance(result, dict) else str(result)
+            else:
+                raise Exception(f"API request failed with status code: {response.status_code}")
+                
+        except Exception as e:
+            raise Exception(f"API request failed: {str(e)}")
     
     def get_connection_info(self) -> Dict[str, Any]:
-        """
-        Get current connection configuration information.
-        
-        Returns:
-            Dictionary containing connection details
-        """
+        """Get current connection configuration information"""
         return {
-            "endpoint": self.endpoint,
-            "effective_endpoint": self._get_effective_endpoint(),
-            "use_private_endpoint": self.use_private_endpoint,
-            "private_endpoint_ip": self.private_endpoint_ip,
-            "private_endpoint_fqdn": self.private_endpoint_fqdn,
-            "api_version": self.api_version,
-            "deployment_name": self.deployment_name,
-            "connection_working": self.connection_working
+            'endpoint': self.url,
+            'deployment_name': self.deployment_name,
+            'api_version': self.api_version,
+            'connection_status': 'Connected' if self.connection_working else 'Disconnected',
+            'host': self.host
         }
     
     def summarize_content(self, content: str, max_length: int = 500) -> str:
-        """
-        Generate a concise summary of the content.
+        """Generate a concise summary of the content"""
         
-        Args:
-            content: Text content to summarize
-            max_length: Maximum length of summary in words
-            
-        Returns:
-            Generated summary
-        """
+        system_prompt = f"""You are an expert document analyst. Create a concise summary of the provided content in approximately {max_length} words or less. Focus on the main points, key insights, and essential information."""
         
-        if not self.connection_working or self.client is None:
-            raise Exception(
-                "Azure OpenAI connection not available. Please check your firewall settings:\n\n"
-                "1. Go to your Azure OpenAI resource in Azure Portal\n"
-                "2. Navigate to 'Networking' section\n"
-                "3. Either:\n"
-                "   - Add your current IP address to allowed IPs, OR\n"
-                "   - Change from 'Selected networks' to 'All networks'\n"
-                "4. Save the changes and wait a few minutes\n\n"
-                "Error: Connection blocked by Virtual Network/Firewall rules"
-            )
+        prompt = f"""Please provide a comprehensive summary of the following content:
+
+Content:
+{content}
+
+Requirements:
+- Maximum {max_length} words
+- Include key points and main themes
+- Maintain clarity and readability
+- Focus on actionable insights"""
+        
+        try:
+            return self._make_api_request(prompt, system_prompt)
+        except Exception as e:
+            return f"Summary generation failed: {str(e)}"
+    
+    def evaluate_against_criteria(self, content: str, criterion_name: str, criterion_description: str) -> Dict[str, Any]:
+        """Evaluate content against a specific criterion"""
+        
+        system_prompt = f"""You are an expert document evaluator. Evaluate the provided content against the specified criterion and provide a detailed assessment in JSON format."""
         
         prompt = f"""
-        Create a very concise summary of this document in simple, everyday language. Keep it under {max_length} words. do not include any headers.
-        Focus on:
-        - Key purpose or goal, keep it under 100 words.
-        - Areas of improvement in the document. keep it under 100 words.
+        Evaluate the following content against this criterion:
         
-        Write in plain language that anyone can understand. Avoid technical jargon.
+        Criterion: {criterion_name}
+        Description: {criterion_description}
         
         Content:
         {content}
         
-        Summary:
-        """
-        
-        try:
-            if self.client is None:
-                raise Exception("Client not initialized")
-                
-            response = self.client.chat.completions.create(
-                model=self.deployment_name,  # the newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
-                messages=[
-                    {
-                        "role": "system", 
-                        "content": "You are an expert document analyst. Provide clear, concise summaries that capture the essence of the content."
-                    },
-                    {"role": "user", "content": prompt}
-                ],
-                max_tokens=1000,
-                temperature=0.3
-            )
-            
-            content = response.choices[0].message.content or ""
-            return content.strip() if content else "Summary could not be generated"
-            
-        except Exception as e:
-            error_msg = str(e)
-            if "Virtual Network is configured" in error_msg:
-                raise Exception(
-                    "Virtual Network Configuration Issue:\n\n"
-                    "Your Azure OpenAI resource is configured with a Virtual Network, which requires a specific VNet endpoint.\n\n"
-                    "To fix this:\n"
-                    "1. Go to Azure Portal → Your OpenAI Resource → Networking\n"
-                    "2. Under 'Public network access':\n"
-                    "   - Change from 'Disabled' to 'Enabled from all networks'\n"
-                    "   - OR change from 'Enabled from selected virtual networks and IP addresses' to 'Enabled from all networks'\n"
-                    "3. Click 'Save' and wait 5-10 minutes\n"
-                    "4. Try again\n\n"
-                    "Alternative: If you need to keep VNet restrictions, you'll need to deploy this application within the same Azure VNet.\n\n"
-                    f"Technical error: {error_msg}"
-                )
-            elif "403" in error_msg and ("Virtual Network" in error_msg or "Firewall" in error_msg):
-                raise Exception(
-                    "Access denied due to Azure firewall rules. To fix this:\n\n"
-                    "1. Go to your Azure OpenAI resource in Azure Portal\n"
-                    "2. Click on 'Networking' in the left menu\n"
-                    "3. Under 'Firewalls and virtual networks':\n"
-                    "   - Change from 'Selected networks' to 'All networks', OR\n"
-                    "   - Add your current IP address to the allowed list\n"
-                    "4. Click 'Save' and wait 2-3 minutes for changes to take effect\n"
-                    "5. Try the analysis again\n\n"
-                    f"Technical error: {error_msg}"
-                )
-            else:
-                raise Exception(f"Failed to generate summary: {str(e)}")
-    
-    def evaluate_against_criteria(self, content: str, criterion_name: str, 
-                                criterion_description: str) -> Dict[str, Any]:
-        """
-        Evaluate content against a specific criterion.
-        
-        Args:
-            content: Text content to evaluate
-            criterion_name: Name of the evaluation criterion
-            criterion_description: Description of what the criterion measures
-            
-        Returns:
-            Dictionary containing evaluation results
-        """
-        
-        prompt = f"""
-        You are an expert document analyst. Evaluate the following content against the specified criterion and provide a detailed analysis.
-
-        Criterion: {criterion_name}
-        Description: {criterion_description}
-
-        Content to evaluate:
-        {content}
-
-        Please provide your evaluation in JSON format with the following structure:
+        Please provide your evaluation in JSON format:
         {{
-            "ranking": "Green|Amber|Red",
-            "score": 7.5,
+            "score": 8,
+            "ranking": "Green",
             "explanation": "Detailed explanation of the evaluation",
-            "key_findings": ["Finding 1", "Finding 2", "Finding 3"],
+            "key_findings": ["Finding 1", "Finding 2"],
             "recommendations": ["Recommendation 1", "Recommendation 2"]
         }}
-
-        Ranking criteria:
-        - Green: Excellent performance (8-10 points) - meets or exceeds expectations
-        - Amber: Good performance with room for improvement (5-7 points) - partially meets expectations
-        - Red: Poor performance requiring significant improvement (1-4 points) - does not meet expectations
-
-        Score should be between 1-10 where 10 is excellent and 1 is very poor.
+        
+        Score scale: 1-10 (1=Very Poor, 10=Excellent)
+        Ranking: Green (8-10), Amber (5-7), Red (1-4)
         """
         
         try:
-            if self.client is None:
-                raise Exception("Client not initialized")
+            response = self._make_api_request(prompt, system_prompt)
+            
+            # Try to parse JSON response
+            try:
+                result = json.loads(response)
+                return self._validate_evaluation_result(result)
+            except json.JSONDecodeError:
+                # If response is not JSON, extract information manually
+                return self._parse_evaluation_response(response, criterion_name)
                 
-            response = self.client.chat.completions.create(
-                model=self.deployment_name,  # the newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
-                messages=[
-                    {
-                        "role": "system",
-                        "content": "You are an expert document evaluator. Provide objective, detailed analysis in the exact JSON format requested."
-                    },
-                    {"role": "user", "content": prompt}
-                ],
-                response_format={"type": "json_object"},
-                max_tokens=1500,
-                temperature=0.2
-            )
-            
-            content = response.choices[0].message.content
-            if not content:
-                raise Exception("No response content received")
-            result = json.loads(content)
-            
-            # Validate and clean the result
-            validated_result = self._validate_evaluation_result(result)
-            
-            return validated_result
-            
-        except json.JSONDecodeError as e:
-            raise Exception(f"Failed to parse evaluation response as JSON: {str(e)}")
         except Exception as e:
-            raise Exception(f"Failed to evaluate content: {str(e)}")
+            return {
+                "score": 5,
+                "ranking": "Amber",
+                "explanation": f"Evaluation failed: {str(e)}",
+                "key_findings": [],
+                "recommendations": ["Please check the AI service connection"]
+            }
     
     def _validate_evaluation_result(self, result: Dict[str, Any]) -> Dict[str, Any]:
         """Validate and clean evaluation result"""
-        
         # Ensure required fields exist
-        required_fields = ['ranking', 'score', 'explanation']
-        for field in required_fields:
-            if field not in result:
-                raise ValueError(f"Missing required field: {field}")
-        
-        # Validate ranking
-        valid_rankings = ['Green', 'Amber', 'Red']
-        if result['ranking'] not in valid_rankings:
-            # Try to map common variations
-            ranking_lower = result['ranking'].lower()
-            if ranking_lower in ['green', 'good', 'excellent']:
+        if 'score' not in result:
+            result['score'] = 5
+        if 'ranking' not in result:
+            score = result.get('score', 5)
+            if score >= 8:
                 result['ranking'] = 'Green'
-            elif ranking_lower in ['amber', 'yellow', 'warning', 'moderate']:
+            elif score >= 5:
                 result['ranking'] = 'Amber'
-            elif ranking_lower in ['red', 'poor', 'bad', 'critical']:
-                result['ranking'] = 'Red'
             else:
-                result['ranking'] = 'Amber'  # Default fallback
+                result['ranking'] = 'Red'
         
-        # Validate score
-        try:
-            score = float(result['score'])
-            result['score'] = max(1.0, min(10.0, score))  # Clamp between 1-10
-        except (ValueError, TypeError):
-            result['score'] = 5.0  # Default fallback
+        # Ensure score is within valid range
+        result['score'] = max(1, min(10, result.get('score', 5)))
         
-        # Ensure explanation is a string
-        if not isinstance(result['explanation'], str):
-            result['explanation'] = str(result['explanation'])
+        # Ensure explanation exists
+        if 'explanation' not in result:
+            result['explanation'] = 'No detailed explanation provided'
         
         # Ensure key_findings is a list
         if 'key_findings' not in result:
@@ -305,7 +224,35 @@ class AzureOpenAIClient:
         
         return result
     
-
+    def _parse_evaluation_response(self, response: str, criterion_name: str) -> Dict[str, Any]:
+        """Parse non-JSON evaluation response"""
+        # Basic parsing logic for when JSON parsing fails
+        score = 5  # Default score
+        ranking = "Amber"  # Default ranking
+        
+        # Try to extract score from response
+        import re
+        score_match = re.search(r'score[:\s]*(\d+)', response.lower())
+        if score_match:
+            score = int(score_match.group(1))
+            score = max(1, min(10, score))
+        
+        # Determine ranking based on score
+        if score >= 8:
+            ranking = "Green"
+        elif score >= 5:
+            ranking = "Amber"
+        else:
+            ranking = "Red"
+        
+        return {
+            "score": score,
+            "ranking": ranking,
+            "explanation": response[:500] + "..." if len(response) > 500 else response,
+            "key_findings": [],
+            "recommendations": [f"Review {criterion_name} based on the analysis provided"]
+        }
+    
     def test_connection(self) -> tuple[bool, str]:
         """Test the Azure OpenAI connection"""
         
@@ -313,11 +260,8 @@ class AzureOpenAIClient:
             return False, "Client not initialized properly"
         
         try:
-            response = self.client.chat.completions.create(
-                model=self.deployment_name,
-                messages=[{"role": "user", "content": "Hello, this is a connection test."}],
-                max_tokens=10
-            )
-            return True, "Connection successful"
+            # Test with a simple request
+            test_response = self._make_api_request("Test connection - please respond with 'Connection successful'")
+            return True, f"Connection successful. Response: {test_response[:100]}..."
         except Exception as e:
-            return False, str(e)
+            return False, f"Connection test failed: {str(e)}"
