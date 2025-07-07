@@ -305,64 +305,7 @@ class AzureOpenAIClient:
         
         return result
     
-    def analyze_content_structure(self, content: str) -> Dict[str, Any]:
-        """
-        Analyze the structure and organization of content.
-        
-        Args:
-            content: Text content to analyze
-            
-        Returns:
-            Dictionary containing structure analysis
-        """
-        
-        prompt = f"""
-        Analyze the structure and organization of the following content. 
-        Provide insights about document quality, readability, and organization.
 
-        Content:
-        {content}
-
-        Please provide your analysis in JSON format:
-        {{
-            "word_count": 1500,
-            "readability_score": "Good|Fair|Poor",
-            "structure_quality": "Excellent|Good|Fair|Poor",
-            "key_topics": ["Topic 1", "Topic 2"],
-            "document_type": "Report|Manual|Policy|Other",
-            "organization_notes": "Brief notes about how well the content is organized"
-        }}
-        """
-        
-        try:
-            response = self.client.chat.completions.create(
-                model=self.deployment_name,  # the newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
-                messages=[
-                    {
-                        "role": "system",
-                        "content": "You are a document structure analyst. Provide objective analysis of document organization and quality."
-                    },
-                    {"role": "user", "content": prompt}
-                ],
-                response_format={"type": "json_object"},
-                max_tokens=800,
-                temperature=0.1
-            )
-            
-            return json.loads(response.choices[0].message.content)
-            
-        except Exception as e:
-            # Return basic analysis if AI call fails
-            word_count = len(content.split()) if content else 0
-            return {
-                "word_count": word_count,
-                "readability_score": "Unknown",
-                "structure_quality": "Unknown",
-                "key_topics": [],
-                "document_type": "Unknown",
-                "organization_notes": f"Analysis failed: {str(e)}"
-            }
-    
     def test_connection(self) -> tuple[bool, str]:
         """Test the Azure OpenAI connection"""
         

@@ -1,6 +1,6 @@
 import os
 import tempfile
-from typing import Union, Any
+from typing import Any
 import streamlit as st
 
 # Document processing libraries
